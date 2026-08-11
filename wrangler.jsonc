@@ -1,0 +1,19 @@
+{
+	"name": "goal-tree-push-worker",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-08-11",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"triggers": {
+		"crons": [
+			"0 * * * *"
+		]
+	},
+	"kv_namespaces": [
+		{
+			"binding": "SUBSCRIPTIONS",
+			"id": "f2bdad8347b049eb8497ac82984a18b3"
+		}
+	]
+}
