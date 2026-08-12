@@ -6,12 +6,22 @@
 		"nodejs_compat"
 	],
 	"triggers": {
-		"crons": ["0 * * * *"]
+		"crons": [
+			"0 * * * *"
+		]
 	},
 	"kv_namespaces": [
 		{
 			"binding": "SUBSCRIPTIONS",
 			"id": "f2bdad8347b049eb8497ac82984a18b3"
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "goal_tree_db",
+			"database_name": "goal-tree-db",
+			"database_id": "589e8b08-4fed-4b52-a7c8-6d2a1d05fe5f",
+			"remote": true
 		}
 	]
 }
