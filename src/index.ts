@@ -7,6 +7,14 @@ interface Env {
   VAPID_SUBJECT: string
 }
 
+interface WebPushSubscription {
+  endpoint: string
+  keys: {
+    p256dh: string
+    auth: string
+  }
+}
+
 interface DueItem {
   key: string
   title: string
@@ -15,7 +23,7 @@ interface DueItem {
 }
 
 interface StoredSubscription {
-  subscription: PushSubscriptionJSON
+  subscription: WebPushSubscription
   items: DueItem[]
   notified: string[]
 }
@@ -35,7 +43,7 @@ function json(data: unknown, status = 200) {
   })
 }
 
-function subscriptionKey(sub: PushSubscriptionJSON): string {
+function subscriptionKey(sub: WebPushSubscription): string {
   return sub.endpoint ?? ''
 }
 
@@ -55,7 +63,7 @@ export default {
     const url = new URL(request.url)
 
     if (url.pathname === '/subscribe' && request.method === 'POST') {
-      const body = await request.json<{ subscription: PushSubscriptionJSON; items: DueItem[] }>()
+      const body = await request.json<{ subscription: WebPushSubscription; items: DueItem[] }>()
       const key = subscriptionKey(body.subscription)
       if (!key) return json({ error: 'invalid subscription' }, 400)
 
@@ -70,7 +78,7 @@ export default {
     }
 
     if (url.pathname === '/unsubscribe' && request.method === 'POST') {
-      const body = await request.json<{ subscription: PushSubscriptionJSON }>()
+      const body = await request.json<{ subscription: WebPushSubscription }>()
       const key = subscriptionKey(body.subscription)
       if (key) await env.SUBSCRIPTIONS.delete(key)
       return json({ ok: true })
@@ -83,29 +91,42 @@ export default {
     webpush.setVapidDetails(env.VAPID_SUBJECT, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY)
 
     const list = await env.SUBSCRIPTIONS.list()
+    console.log(`scheduled: найдено подписок: ${list.keys.length}`)
 
     for (const key of list.keys) {
       const record = await env.SUBSCRIPTIONS.get<StoredSubscription>(key.name, 'json')
-      if (!record) continue
+      if (!record) {
+        console.log(`scheduled: запись ${key.name} не найдена при чтении`)
+        continue
+      }
+
+      console.log(`scheduled: запись ${key.name}, items=${record.items.length}, notified=${JSON.stringify(record.notified)}`)
 
       const notified = new Set(record.notified)
       let changed = false
 
       for (const item of record.items) {
         const days = daysUntil(item.dueDate)
+        console.log(`scheduled: item ${item.key}, dueDate=${item.dueDate}, days=${days}, ужеУведомлён=${notified.has(item.key)}`)
+
         if (days > 1) continue
-        if (notified.has(item.key)) continue
+        if (notified.has(item.key)) {
+          console.log(`scheduled: пропускаем ${item.key} - уже уведомляли`)
+          continue
+        }
 
         const body = days === 0 ? 'Сегодня' : days < 0 ? `Просрочено на ${-days} дн.` : 'Завтра'
 
         try {
           await webpush.sendNotification(
             record.subscription as any,
-            JSON.stringify({ title: item.title, body, url: item.url })
+            JSON.stringify({ title: item.title, body, url: item.url, tag: item.key })
           )
           notified.add(item.key)
           changed = true
+          console.log(`scheduled: отправлено уведомление для ${item.key}`)
         } catch (err: any) {
+          console.log(`scheduled: ошибка отправки для ${item.key}: ${err.statusCode} ${err.message}`)
           if (err.statusCode === 410 || err.statusCode === 404) {
             await env.SUBSCRIPTIONS.delete(key.name)
             changed = false
@@ -117,6 +138,7 @@ export default {
       if (changed) {
         record.notified = Array.from(notified)
         await env.SUBSCRIPTIONS.put(key.name, JSON.stringify(record))
+        console.log(`scheduled: сохранили notified=${JSON.stringify(record.notified)} для ${key.name}`)
       }
     }
   },
