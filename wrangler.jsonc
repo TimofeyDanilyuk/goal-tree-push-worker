@@ -18,10 +18,9 @@
 	],
 	"d1_databases": [
 		{
-			"binding": "goal_tree_db",
+			"binding": "DB",
 			"database_name": "goal-tree-db",
-			"database_id": "589e8b08-4fed-4b52-a7c8-6d2a1d05fe5f",
-			"remote": true
+			"database_id": "589e8b08-4fed-4b52-a7c8-6d2a1d05fe5f"
 		}
 	]
 }
